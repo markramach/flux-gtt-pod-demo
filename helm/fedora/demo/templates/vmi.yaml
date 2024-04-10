@@ -1,0 +1,50 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachineInstance
+metadata:
+  name: "{{ .Release.name }}"
+spec:
+  architecture: amd64
+  domain:
+    cpu:
+      cores: 1
+      model: host-model
+      sockets: 1
+      threads: 1
+    devices:
+      disks:
+        - disk:
+            bus: virtio
+          name: containerdisk
+        - disk:
+            bus: virtio
+          name: cloudinitdisk
+      interfaces:
+        - masquerade: {}
+          name: default
+      rng: {}
+    features:
+      acpi:
+        enabled: true
+    firmware:
+      uuid: ca6024eb-db18-4850-a1df-f530f6754287
+    machine:
+      type: q35
+    resources:
+      requests:
+        memory: 1024M
+  evictionStrategy: None
+  networks:
+    - name: default
+      pod: {}
+  terminationGracePeriodSeconds: 0
+  volumes:
+    - containerDisk:
+        image: kubevirt/fedora-with-test-tooling-container-disk:devel
+        imagePullPolicy: IfNotPresent
+      name: containerdisk
+    - cloudInitNoCloud:
+        userData: |-
+          #cloud-config
+          password: fedora
+          chpasswd: { expire: False }
+      name: cloudinitdisk
