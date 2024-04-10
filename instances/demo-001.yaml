@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-001-fedora
+  namespace: argocd
+spec:
+  destination:
+    namespace: demo-001
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: helm/fedora/demo
+    repoURL: https://github.com/markramach/flux-gtt-pod-demo.git
+    targetRevision: HEAD
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
