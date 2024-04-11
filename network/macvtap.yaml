@@ -1,0 +1,87 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: macvtap-deviceplugin-config
+data:
+  DP_MACVTAP_CONF: |
+    [ {
+        "name" : "dataplane",
+        "lowerDevice" : "eno3",
+        "mode": "bridge",
+        "capacity" : 10
+    } ]
+
+---
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: macvtap-cni
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      name: macvtap-cni
+  template:
+    metadata:
+      labels:
+        name: macvtap-cni
+    spec:
+      hostNetwork: true
+      hostPID: true
+      priorityClassName: system-node-critical
+      containers:
+      - name: macvtap-cni
+        command: ["/macvtap-deviceplugin", "-v", "3", "-logtostderr"]
+        envFrom:
+          - configMapRef:
+              name: macvtap-deviceplugin-config
+        image: quay.io/kubevirt/macvtap-cni:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: "60m"
+            memory: "30Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: deviceplugin
+            mountPath: /var/lib/kubelet/device-plugins
+      initContainers:
+      - name: install-cni
+        command: ["cp", "/macvtap-cni", "/host/opt/cni/bin/macvtap"]
+        image: quay.io/kubevirt/macvtap-cni:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "15Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: cni
+            mountPath: /host/opt/cni/bin
+            mountPropagation: Bidirectional
+      volumes:
+        - name: deviceplugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: cni
+          hostPath:
+            path: /opt/cni/bin
+
+---
+
+kind: NetworkAttachmentDefinition
+apiVersion: k8s.cni.cncf.io/v1
+metadata:
+  name: dataplane
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: macvtap.network.kubevirt.io/dataplane
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "dataplane",
+      "type": "macvtap",
+      "mtu": 1500
+    }'
